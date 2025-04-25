@@ -510,6 +510,23 @@ test_expect_success 'worktree-prune task --auto only prunes with prunable worktr
 	test_subcommand git worktree prune --expire 3.months.ago <worktree-prune-auto.txt
 '
 
+test_expect_success 'rerere-gc task' '
+	GIT_TRACE2_EVENT="$(pwd)/rerere-gc.txt" \
+		git maintenance run --task=rerere-gc &&
+	test_subcommand git rerere gc <rerere-gc.txt
+'
+
+test_expect_success 'rerere-gc task --auto only prunes with existing rr-cache dir' '
+	mkdir .git/rr-cache &&
+	GIT_TRACE2_EVENT="$(pwd)/rerere-gc-auto.txt" \
+		git maintenance run --auto --task=rerere-gc &&
+	test_subcommand ! git rerere gc <rerere-gc-auto.txt &&
+	: >.git/rr-cache/entry &&
+	GIT_TRACE2_EVENT="$(pwd)/rerere-gc-auto.txt" \
+		git maintenance run --auto --task=rerere-gc &&
+	test_subcommand git rerere gc <rerere-gc-auto.txt
+'
+
 test_expect_success '--auto and --schedule incompatible' '
 	test_must_fail git maintenance run --auto --schedule=daily 2>err &&
 	test_grep "at most one" err

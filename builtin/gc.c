@@ -16,6 +16,7 @@
 #include "builtin.h"
 #include "abspath.h"
 #include "date.h"
+#include "dir.h"
 #include "environment.h"
 #include "hex.h"
 #include "config.h"
@@ -381,6 +382,26 @@ static int maintenance_task_rerere_gc(struct maintenance_run_opts *opts UNUSED,
 	rerere_cmd.git_cmd = 1;
 	strvec_pushl(&rerere_cmd.args, "rerere", "gc", NULL);
 	return run_command(&rerere_cmd);
+}
+
+static int rerere_gc_condition(struct gc_config *cfg UNUSED)
+{
+	struct strbuf path = STRBUF_INIT;
+	int should_gc = 0;
+	DIR *dir;
+
+	/* Skip garbage collecting the rerere cache in case rerere is disabled. */
+	repo_git_path_replace(the_repository, &path, "rr-cache");
+
+	dir = opendir(path.buf);
+	if (!dir)
+		goto out;
+	should_gc = !!readdir_skip_dot_and_dotdot(dir);
+
+out:
+	strbuf_release(&path);
+	closedir(dir);
+	return should_gc;
 }
 
 static int too_many_loose_objects(struct gc_config *cfg)
@@ -1501,6 +1522,7 @@ enum maintenance_task_label {
 	TASK_PACK_REFS,
 	TASK_REFLOG_EXPIRE,
 	TASK_WORKTREE_PRUNE,
+	TASK_RERERE_GC,
 
 	/* Leave as final value */
 	TASK__COUNT
@@ -1546,6 +1568,11 @@ static struct maintenance_task tasks[] = {
 		"worktree-prune",
 		maintenance_task_worktree_prune,
 		worktree_prune_condition,
+	},
+	[TASK_RERERE_GC] = {
+		"rerere-gc",
+		maintenance_task_rerere_gc,
+		rerere_gc_condition,
 	},
 };
 
