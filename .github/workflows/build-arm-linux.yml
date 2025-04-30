@@ -1,59 +1,54 @@
-name: 编译Git v2.17.0 Linux ARM可执行文件
+name: 编译Git Linux ARM可执行文件
 
 on:
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: '要编译的Git标签'
-        required: true
-        default: 'v2.17.0'
+  push:
+    tags:
+      - 'v2.17.0'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: 检出代码
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.inputs.tag }}
           fetch-depth: 0
-      
+
       - name: 安装依赖
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential autoconf libssl-dev libcurl4-openssl-dev \
             libexpat-dev gettext zlib1g-dev asciidoc xmlto docbook2x \
             gcc-arm-linux-gnueabihf libc6-dev-armhf-cross
-      
+
       - name: 配置Git源码
         run: |
           ./configure --host=arm-linux-gnueabihf \
             --build=x86_64-linux-gnu \
             --prefix=/usr \
             --without-tcltk
-      
+
       - name: 编译Git
         run: |
           make -j$(nproc) CFLAGS="-O2" LDFLAGS="-static" NO_GETTEXT=1 NO_OPENSSL=1 NO_CURL=1 NO_EXPAT=1 NO_REGEX=1 NO_PTHREADS=1 NO_ICONV=1 CROSS_COMPILE=arm-linux-gnueabihf-
-      
+
       - name: 创建发布目录
         run: |
           mkdir -p release
-          cp git release/git-${{ github.event.inputs.tag }}-linux-arm
-          arm-linux-gnueabihf-strip release/git-${{ github.event.inputs.tag }}-linux-arm
-      
+          cp git release/git-${{ github.ref_name }}-linux-arm
+          arm-linux-gnueabihf-strip release/git-${{ github.ref_name }}-linux-arm
+
       - name: 打包可执行文件
         run: |
           cd release
-          tar -czvf git-${{ github.event.inputs.tag }}-linux-arm.tar.gz git-${{ github.event.inputs.tag }}-linux-arm
-      
-      - name: 推送到标签
+          tar -czvf git-${{ github.ref_name }}-linux-arm.tar.gz git-${{ github.ref_name }}-linux-arm
+
+      - name: 上传到发布
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.event.inputs.tag }}
           files: |
-            release/git-${{ github.event.inputs.tag }}-linux-arm.tar.gz
-            release/git-${{ github.event.inputs.tag }}-linux-arm
+            release/git-${{ github.ref_name }}-linux-arm.tar.gz
+            release/git-${{ github.ref_name }}-linux-arm
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
